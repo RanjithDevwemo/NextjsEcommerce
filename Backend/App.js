@@ -4,6 +4,7 @@ const mysql = require('mysql');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
+const { error } = require('console');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -39,8 +40,8 @@ db.connect((err) => {
 });
 
 // Middleware
-app.use(express.json()); // Parse JSON bodies
-app.use(cors()); // Enable CORS for all routes
+app.use(express.json()); 
+app.use(cors()); 
 app.use(express.static('uploads')); // Serve uploaded files statically
 
 // Route to handle file upload and additional fields
@@ -72,45 +73,115 @@ app.get('/', (req, res) => {
 });
 
 
-// app.get("/api/products/:id",(req,res)=>{
-//   const productId=req.params.id;
-//   EcomDb.query("SELECT * FROM products WHERE id = ?",[productId],(error,result)=>{
-//     if(error) throw error;
-//     if(result.length>0){
-//     res.json(result[0])
-//     } else{
-//       res.status(404).send("Product Not Found")
-//     }
-//   })
-// })
+// Route to retrieve an image by ID
+app.get('/image/:id', (req, res) => {
+  const imageId = req.params.id;
+  console.log(imageId);
+  const sql = 'SELECT * FROM images WHERE id = ?';
+  db.query(sql, [imageId], (err, result) => {
+    if (err) {
+      console.error('Error retrieving image from database:', err);
+      return res.status(500).json({ error: 'Error retrieving image' });
+    }
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    return res.status(200).json(result[0]);
+  });
 
-// //Add to Cart Page
-// app.post("/api/cart/add",(req,res)=>{
-//   const {productId}=req.body;
-//   EcomDb.query("INSERT INTO cart (productid) value ?",[productId],(error,result)=>{
-//     if(error){
-//     console.log("Add to Cart Page Error",error);
-//     res.status(500).send("Failled to add product to cart")
-//     }
-//     else{
-//       console.log(result);
-//    res.status(200).json("Product added in add to cart");
-//     }
-//   })
-// })
 
-// //Get cart count
-// app.get('/api/cart/count', (req, res) => {
-//   connection.query('SELECT COUNT(*) AS count FROM cart', (error, results) => {
-//     if (error) {
-//       console.error('Error fetching cart count:', error);
-//       res.status(500).send('Failed to fetch cart count');
-//     } else {
-//       const count = results[0].count;
-//       res.json({ count });
-//     }
-//   });
-// });
+});
+
+// button Add to Cart
+
+app.post("/api/cart/add/", (req, res) => {
+  // const { id } = req.body;
+  console.log(`Add to Cart Page ID: ${imageId}`);
+
+  // Retrieve product details from 'images' table
+  // const sql = 'SELECT id, name, image, price, description FROM images WHERE id = ?';
+const sql="INSERT INTO cart (productid,image,description,name,price) SELECT id,name,image,price,description FROM images WHERE id=?"
+  db.query(sql, [imageId], (err, results) => {
+    if (err) {
+      console.error('Error retrieving product from images table:', err);
+      return res.status(500).json({ error: 'Error retrieving product' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Insert product into 'cart' table
+    const cartSql = 'INSERT INTO cart (productid, name, image, price, description) VALUES (?, ?, ?, ?, ?)';
+    const  {id, name,image, price, description}=req.body
+    
+    db.query(cartSql, [id, name,image, price, description], (error, cartResult) => {
+      if (error) {
+        console.error('Error adding product to cart:', error);
+        return res.status(500).json({ error: 'Error adding product to cart' });
+      }
+
+      console.log('Product added to cart successfully:', cartResult);
+      res.status(200).json({ status: 'success', product });
+    });
+  });
+});
+
+app.post("/api/cart/add/", (req, res) => {
+
+  const {id,name,image,price,description}=req.body;
+
+  // const sql="INSERT INTO cart (image,productid,name,price,)SELECT name, age FROM table1 WHERE id = 1"; 
+});
+
+
+
+//featch all cart items
+app.get("/api/cart/add/", (req, res) => {
+  const sql = 'SELECT * FROM cart';
+  db.query(sql,(error,result)=>{
+    if(error){
+      console.log("error ",error);
+      return res.status(500).json({error:"Error Aquired"});
+    }
+    return res.status(200).json(result);
+  });
+});
+
+//Delete Product by Id
+app.delete("/api/cart/delete/:id",(req,res)=>{
+  const id=req.params.id;
+  console.log(id);
+  const sql ="delete from cart where id = ? ";
+  // const ql="DELETE FROM cart WHERE `cart`.`id` = ?"
+  db.query(sql,id,(err,result)=>{
+    if (err) {
+      // throw err;
+      console.log("error Aquired" ,id);
+      return res.status(500).json({error:"error Aquired",err});
+    }
+    else if(result.length==0){
+      return res.status(404).json({result:"not found",result});
+    }
+    // return res.status(200).json("true");
+    return res.status(200).send("true");
+
+  })
+})
+
+// cart Counting in Nav Bar
+app.get('/api/cart/count', (req, res) => {
+  db.query('SELECT COUNT(*) AS count FROM cart', (error, results) => {
+    if (error) {
+      console.error('Error fetching cart count:', error);
+      res.status(500).send('Failed to fetch cart count');
+    } else {
+      const count = results[0].count;
+      res.json({ count });
+    }
+  });
+});
+
 
 
 // MySQL Database Ecom User Details
@@ -140,13 +211,14 @@ app.post('/api/register', (req, res) => {
   try {
 
     const checkUserQuery = 'SELECT * FROM ecom WHERE email = ?';
-    db.query(checkUserQuery, [email], (error, results) => {
+    dbcom.query(checkUserQuery, [email], (error, results) => {
       if (error) {
         throw error;
       }
       if (results.length > 0) {
         res.status(400).send('User already exists');
-      } else {
+      } 
+      else {
    
         const insertUserQuery = 'INSERT INTO ecom (name, email, password) VALUES (?, ?, ?)';
         dbcom.query(insertUserQuery, [name, email, password], (err, result) => {
@@ -158,7 +230,8 @@ app.post('/api/register', (req, res) => {
         });
       }
     });
-  } catch (error) {
+  } 
+  catch (error) {
     console.error('Error registering user:', error);
     res.status(500).send('Error registering user');
   }
