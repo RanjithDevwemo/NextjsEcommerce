@@ -4,7 +4,7 @@ const mysql = require('mysql');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
-const { error } = require('console');
+
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -83,9 +83,6 @@ app.get('/image/:id', (req, res) => {
       console.error('Error retrieving image from database:', err);
       return res.status(500).json({ error: 'Error retrieving image' });
     }
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
     return res.status(200).json(result[0]);
   });
 
@@ -94,44 +91,33 @@ app.get('/image/:id', (req, res) => {
 
 // button Add to Cart
 
-app.post("/api/cart/add/", (req, res) => {
-  // const { id } = req.body;
-  console.log(`Add to Cart Page ID: ${imageId}`);
+app.post("/api/cart/add", (req, res) => {
+  const { id } = req.body;
 
-  // Retrieve product details from 'images' table
-  // const sql = 'SELECT id, name, image, price, description FROM images WHERE id = ?';
-const sql="INSERT INTO cart (productid,image,description,name,price) SELECT id,name,image,price,description FROM images WHERE id=?"
-  db.query(sql, [imageId], (err, results) => {
+  const getProductQuery = 'SELECT * FROM images WHERE id = ?';
+  db.query(getProductQuery, [id], (err, result) => {
     if (err) {
-      console.error('Error retrieving product from images table:', err);
-      return res.status(500).json({ error: 'Error retrieving product' });
+      console.error('Error fetching product from database:', err);
+      return res.status(500).json({ error: 'Error fetching product from database' });
     }
 
-    if (results.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Insert product into 'cart' table
-    const cartSql = 'INSERT INTO cart (productid, name, image, price, description) VALUES (?, ?, ?, ?, ?)';
-    const  {id, name,image, price, description}=req.body
-    
-    db.query(cartSql, [id, name,image, price, description], (error, cartResult) => {
-      if (error) {
-        console.error('Error adding product to cart:', error);
-        return res.status(500).json({ error: 'Error adding product to cart' });
+    const { id, name, image, description, price } = result[0];
+
+    // Insert into cart table
+    const insertIntoCartQuery = 'INSERT INTO cart (productid, name, image, description, price) VALUES (?, ?, ?, ?, ?)';
+    db.query(insertIntoCartQuery, [id, name, image, description, price], (err, insertResult) => {
+      if (err) {
+        console.error('Error inserting product into cart:', err);
+        return res.status(500).json({ error: 'Error inserting product into cart' });
       }
 
-      console.log('Product added to cart successfully:', cartResult);
-      res.status(200).json({ status: 'success', product });
+      return res.status(200).json({ status: 'success', message: 'Product added to cart' });
     });
   });
-});
-
-app.post("/api/cart/add/", (req, res) => {
-
-  const {id,name,image,price,description}=req.body;
-
-  // const sql="INSERT INTO cart (image,productid,name,price,)SELECT name, age FROM table1 WHERE id = 1"; 
 });
 
 
@@ -181,7 +167,6 @@ app.get('/api/cart/count', (req, res) => {
     }
   });
 });
-
 
 
 // MySQL Database Ecom User Details
@@ -245,6 +230,81 @@ app.post('/api/login', (req, res) => {
     
     const selectUserQuery = 'SELECT * FROM ecom WHERE email = ? AND password = ?';
     dbcom.query(selectUserQuery, [email, password], (error, results) => {
+      if (error) {
+        throw error;
+      }
+      if (results.length === 0) {
+        res.status(401).send('Invalid credentials');
+      } else {
+        res.status(200).send('Login successful');
+
+        app.get('/api/user/name', (req, res) => {
+          // const sql = `SELECT * FROM ecom WHERE email =${email}`;
+          
+          const sq =  `SELECT * FROM ecom WHERE email LIKE ${email}`;
+          console.log(sq);
+
+          dbcom.query(sq, (err, result) => {
+            if (err) {
+              console.error('Error retrieving images from database:', err);
+              return res.status(500).json({ error: 'Error retrieving images' });
+            }
+            return res.status(200).json(result);
+          });
+        });
+      
+      }
+    });
+  } catch (error) {
+    console.error('Error logging in:', error);
+    res.status(500).send('Error logging in');
+  }
+});
+
+
+
+
+
+//Admin Register
+app.post('/api/admin/register', (req, res) => {
+  const { name, email, password } = req.body;
+
+  try {
+
+    const checkUserQuery = 'SELECT * FROM ecom WHERE email = ?';
+    db.query(checkUserQuery, [email], (error, results) => {
+      if (error) {
+        throw error;
+      }
+      if (results.length > 0) {
+        res.status(400).send('User already exists');
+      } 
+      else {
+   
+        const insertUserQuery = 'INSERT INTO admin_register (name, email, password) VALUES (?, ?, ?)';
+        db.query(insertUserQuery, [name, email, password], (err, result) => {
+          if (err) {
+            throw err;
+          }
+          console.log(`admin ${name} registered successfully`);
+          res.status(200).send('admin registered successfully');
+        });
+      }
+    });
+  } 
+  catch (error) {
+    console.error('Error registering admin:', error);
+    res.status(500).send('Error registering admin');
+  }
+});
+
+//Admin Login
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body;
+  try {
+    
+    const selectUserQuery = 'SELECT * FROM admin_register WHERE email = ? AND password = ?';
+    db.query(selectUserQuery, [email, password], (error, results) => {
       if (error) {
         throw error;
       }
