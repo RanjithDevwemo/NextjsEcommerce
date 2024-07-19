@@ -4,7 +4,8 @@ const mysql = require('mysql');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
-
+const cookieParser=require("cookie-parser")
+const jwt=require('jsonwebtoken')
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -40,6 +41,7 @@ db.connect((err) => {
 });
 
 // Middleware
+
 app.use(express.json()); 
 app.use(cors()); 
 app.use(express.static('uploads')); // Serve uploaded files statically
@@ -239,17 +241,22 @@ app.post('/api/login', (req, res) => {
         res.status(200).send('Login successful');
 
         app.get('/api/user/name', (req, res) => {
-          // const sql = `SELECT * FROM ecom WHERE email =${email}`;
-          
-          const sq =  `SELECT * FROM ecom WHERE email LIKE ${email}`;
+         
+          // var key=email;
+          const sq =  `SELECT * FROM ecom WHERE email  =?`;
+
           console.log(sq);
 
-          dbcom.query(sq, (err, result) => {
+          dbcom.query(sq,email, (err, result) => {
             if (err) {
               console.error('Error retrieving images from database:', err);
               return res.status(500).json({ error: 'Error retrieving images' });
             }
+            else{
+              console.log(result);
             return res.status(200).json(result);
+            }
+            
           });
         });
       
@@ -262,6 +269,14 @@ app.post('/api/login', (req, res) => {
 });
 
 
+app.post('/api/logout', (req, res) => {
+  try {
+    res.status(200).send('Logout successful');
+  } catch (error) {
+    console.error('Error logging out:', error);
+    res.status(500).send('Failed to logout');
+  }
+});
 
 
 
@@ -319,6 +334,24 @@ app.post('/api/admin/login', (req, res) => {
     res.status(500).send('Error logging in');
   }
 });
+
+
+
+
+
+//user post
+
+// app.post('/api/user', (req, res) => {
+
+//   const {email } = req.body;
+
+// const sql1=`INSERT INTO addtocart (username,useremail)
+// SELECT (name,email)
+// FROM ecom.ecom
+// WHERE ecom.ecom.email = ?`;
+// dbcom.query(sql)
+
+// })
 
 // Start server
 app.listen(PORT, () => {
